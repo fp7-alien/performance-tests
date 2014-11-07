@@ -1,0 +1,62 @@
+
+$ sudo apt-get install autoconf automake libtool libsnmp-dev libpcap-dev
+$ sudo apt-get install libconfig-dev
+$ sudo apt-get install snmp snmpd snmp-mibs-dowloader
+$ git clone git://gitosis.stanford.edu/oflops.git $ cd oflops
+$ git submodule init && git submodule update
+$ git clone git:// github.com/fp7-alien/performace_tests
+$ git clone git://gitosis.stanford.edu/openflow
+$ git checkout -b release/1.0.0 remotes/origin/release/1.0.0 $ cd openflow
+$./boot.sh
+$ ./configure
+$ make && sudo make install
+$ cd .. ; sh ./boot.sh ; 
+
+/--------- Important ----------/ 
+$ patch configure.ac < ./performance_tests/configure.ac.patch
+/----------------------------------/
+
+$./configure --with-openflow-src-dir=<absolute path to openflow branch>; 
+
+$ cp ./performance_test/src_main/*  ./
+
+$ make &&  make install
+
+$ cp ./performance_test/test_configruation_file/* ./
+
+#In each directory:
+ #1.  example_modules/openflow_add_flow
+ #2. example_modules/openflow_mod_flow
+ #3. example_modules/openflow_packet_in
+ #4. example_modules/openflow_packet_out
+ #5. example_modules/openflow_path_delay
+# - replace *.c files with corresponding files form PathDir.tar.gz,
+# - in each Makefile add following switches to variables:
+#  CFLAGS              -Ic:/gsl
+#  LDFLAGS            -Lc:/gsl
+#  LIBS                    -lgsl -lgslcblas
+# - and do make .
+
+#In configuration files:
+#1. alien-addflow.cfg#
+#2. alien-modflow.cfg
+#3. alien-pathdelay.cfg
+#4. alien-pin.cfg
+#5. alien-pout.cfg
+
+#- replace names of ,,control-dev'' and ,,dev''  fields with correct name of network interfaces
+#- fill ,,port_num'' fields with correct of_port number
+#-  fill ,,path'' variable with correct path name of testing module.
+
+#Parameters:
+#flows - the number of used flows
+#data_rate  and probe_rate  - in  tests should be equal [ Mbps ]
+# pkt_size - packet size [bytes]
+# table - strict match flow entries (0), wildcards (1)
+#probe_time - max duration of test [s]
+#echo_rate - echo request rate [s].
+
+
+#Now,  we can start tests:
+
+/usr/local/bin/oflops  -i <path-to-config-file>/<test-config-file>  -o  <path-to-output-file>/<output-file-name>
