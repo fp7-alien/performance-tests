@@ -1,0 +1,302 @@
+******************************************************************************************************
+******************************************************************************************************
+PacketIn test
+******************************************************************************************************
+******************************************************************************************************
+
+For every packet that does not have a matching flow entry  or  if a packet matches an entry with a forward
+to In_Port action or  when flow table is empty, an asynchronous  packet-in event is sent to the controller.
+If the switch has sufficient memory to buffer packets that are sent to the controller, the packet-in events
+contain some fraction of the packet header (by default 128 bytes) and a buffer ID to be used by the controller,
+when it is ready for the switch to forward the packet. Switches that do not support internal buffering (or
+have run out of internal buffering) must send the full packet to the controller as part of the event.
+
+ALIEN platforms are based on existing network devices and don't support such packet buffering. In In_Port
+action  the OpenFlow controller receives whole data packets. It is very important to check, how many In_Packet
+actions can be served by Alien platforms and how  length of data packets affect the delay of packet transfer.
+In order to measure In_Packet action throughput and packet delay, the following scenario was prepared. When 
+ALIEN-OFLOPS application receives OFPT_HELLO messages, OFPT_FLOW_MOD message is sent. OFPT_FLOW_MOD contains 
+OFPFC_DELETE action, which is applied to all installed flows. Simultaneously, through dev1 ALIEN-OFLOPS starts 
+generate UDP packets, which contain (in payload field) sequence number and generation time. Since the OpenFlow 
+switch flow table is empty, switch sends OFPT_PACKET_IN messages containing UDP packets. Basing on reception 
+of OFPT_PACKET_IN message and generation time of conveyed UDP packet we can calculate delay of In_Packet action. 
+Additionally, basing on sequence numbers loss probability is calculated. Test is repeated for different UDP 
+packets sizes and different time interval between packets.
+
+           +----+---+                +----+---+  +----+---+     +----+---+
+           |  dev0  |                | sdev0  |  |  dev1  |     | sdev2  |
+           | (Eth0) |                | (Eth0) |  | (Eth1) |     | (Eth2) |
+           +---+----+                +---+----+  +---+----+     +---+----+
+               |                         |           |              |     
+               |                         |           |  UDP_packet  |     
+               |     OFPT_HELLO          |           | +----------> |     
+               | <---------------------+ |           |              |     
+               |                         |           |              |     
+               |     OFPT_FLOW_MOD       |           |              |     
+               |     (OFPFC_DELETE)      |           |              |     
+               | +---------------------> |           |  UDP_packet  |     
+               |                         |           | +----------> |     
+               |       OFPT_FLOW_MOD     |           |              |     
+               |       (OFPFC_ADD ::     |           |              |     
+               |  Flow1: * OFPP_IN_PORT) |           |              |     
+               | +---------------------> |           |              |     
+               |                         |           |  UDP_packet  |     
+          +----------------------------------------+ | +----------> |     
+PacketIN ^     |                         |           |              |     
+ delay   |     |      OFPT_PACKET_IN     |           |              |     
+         v     |       (UDP_packet)      |           |              |     
+          +----+ <---------------------+ |           |              |     
+               |                         |           |  UDP_packet  |     
+          +----------------------------------------+ | +----------> |     
+PacketIN ^     |                         |           |              |     
+ delay   |     |      OFPT_PACKET_IN     |           |              |     
+         v     |       (UDP_packet)      |           |              |     
+          +----+ <---------------------+ |           |              |     
+               |                         |           |  UDP_packet  |     
+          +----------------------------------------+ | +----------> |     
+PacketIN ^     |                         |           |              |     
+ delay   |     |      OFPT_PACKET_IN     |           |              |     
+         v     |       (UDP_packet)      |           |              |     
+          +----+                         |           |              |     
+               +                         +           +              +     
+
+
+
+******************************************************************************************************
+******************************************************************************************************
+PacketOut test
+******************************************************************************************************
+******************************************************************************************************
+
+This test scenario is similar to previous one. In this test ALIEN-OFLOPS application generates sequence of 
+OFPT_PACKET_OUT messages, which convey UDP packets. As previously, UDP packets are marked by sequence 
+numbers and OFPT_PACKET_OUT message generation time. The OFPT_PACKET_OUT message contains also of_port 
+number determining the output port of the action.  Basing on reception of UDP packets and generation time  
+conveyed in this packet we can calculate delay of Out_Packet action. Moreover basing on sequence numbers loss 
+probability is calculated. Test is repeated for different UDP packet sizes and different time interval between 
+packets.
+
+               +----+---+                +----+---+  +----+---+     +----+---+
+               |  dev0  |                | sdev0  |  |  dev1  |     | sdev2  |
+               | (Eth0) |                | (Eth0) |  | (Eth1) |     | (Eth2) |
+               +---+----+                +---+----+  +---+----+     +----+---+
+                   |                         |           |               |    
+                   |                         |           |               |    
+                   |     OFPT_HELLO          |           |               |    
+                   | <---------------------+ |           |               |    
+                   |                         |           |               |    
+                   |     OFPT_FLOW_MOD       |           |               |    
+                   |     (OFPFC_DELETE)      |           |               |    
+                   | +---------------------> |           |               |    
+                   |                         |           |               |    
+                   |       OFPT_FLOW_MOD     |           |               |    
+                   |       (OFPFC_ADD ::     |           |               |    
+                   |  Flow1: * OFPP_IN_PORT) |           |               |    
+                   | +---------------------> |           |               |    
+                   |                         |           |               |    
+                   |     OFPT_PACKET_OUT     |           |               |    
+                   |  (of_port A:UDP_packet) |           |               |    
+            +------+ +---------------------> |           |               |    
+PacketOut ^        |                         |           |               |    
+  delay   |        |                         |           |               |    
+          v        |                         |           |  UDP_packet   |    
+            +--------------------------------------------+ <----------+  |    
+                   |     OFPT_PACKET_OUT     |           |               |    
+                   |  (of_port A:UDP_packet) |           |               |    
+            +------+ +---------------------> |           |               |    
+PacketOut ^        |                         |           |               |    
+  delay   |        |                         |           |               |    
+          v        |                         |           |  UDP_packet   |    
+            +--------------------------------------------+ <-----------+ |    
+                   |                         |           |               |    
+                   |     OFPT_PACKET_OUT     |           |               |    
+                   |  (of_port A:UDP_packet) |           |               |    
+            +------+ +---------------------> |           |               |    
+PacketOut ^        |                         |           |               |    
+  delay   |        |                         |           |               |    
+          v        |                         |           |  UDP_packet   |    
+            +--------------------------------------------+ <-----------+ |    
+                   +                         +           +               +    
+
+
+
+******************************************************************************************************
+******************************************************************************************************
+Add_flow delay
+******************************************************************************************************
+******************************************************************************************************
+
+The aim of this test is to determine time required to add  the given number of flows. Only exact match flows 
+entries are considered. This test procedure is repeated several times in order to achieve reliable test results. 
+During whole test  time ALIEN-OFLOPS application generates UDP packets containing in data field  packet 
+generation time and send these messages through dev1 port. In the first step Alien platform flow table is 
+cleared. Next, the determined number of ADD_FLOW operation is generated and sent. It starts time counter.  
+Only  the last added flow entry matches generated UDP packets. According to action bound with this flow, the 
+generated packets which appear on sdev1 port are directed to sdev2 port. When some packet occurson dev2 port 
+triggers the test procedure repetition and stops time counter.   Time counter shows how long flows are installed.  
+
+
++----+---+                +----+---+  +----+---+     +----+---+  +----+---+     +----+---+              
+|  dev0  |                | sdev0  |  |  dev1  |     | sdev2  |  |  dev2  |     | sdev2  |              
+| (Eth0) |                | (Eth0) |  | (Eth1) |     | (Eth2) |  | (Eth2) |     | (Eth2) |              
++---+----+                +---+----+  +---+----+     +----+---+  +---+----+     +----+---+              
+    |                         |           |               |          |               |                  
+    |                         |           |               |          |               |                  
+    |     OFPT_HELLO          |           |               |          |               |                  
+    | <---------------------+ |           |  UDP_Packet   |          |               |                  
+    |                         |           | +-----------> |          |               |                  
+    |     OFPT_FLOW_MOD       |           |               |          |               |                  
+    |     (OFPFC_DELETE)      |           |  UDP_Packet   |          |               |                  
+    | +---------------------> |           | +-----------> |          |               |                  
+    |                         |           |               |          |               |                  
+    |       OFPT_FLOW_MOD     |           |  UDP_Packet   |          |               |                  
+    |       (OFPFC_ADD ::     |           | +-----------> |          |               |                  
+    |  Flow1: * OFPP_IN_PORT) |           |               |          |               |                  
+    | +---------------------> |           |  UDP_Packet   |          |               |                  
+    |                         |           | +-----------> |          |               |                  
+    |      OFPT_FLOW_MOD      |           |               |          |               |                  
+    |      (OFPFC_ADD ::      |           |  UDP_Packet   |          |               |                  
+    |   Flow1: *OFPP_IN_PORT, |           | +-----------> |          |               |                  
+    |           …             |           |               |          |               |                  
+    |    FlowN: * of_portB)   |           |  UDP_Packet   |          |               |                  
+    | +---------------------> +-----------+ +-----------> +---------------------------------+ ^         
+    |                         |           |               |          |               |        | Add_flow
+    |                         |           |  UDP_Packet   |          |               |        |  delay  
+    |     OFPT_FLOW_MOD       |           | +-----------> |          |  UDP_Packet   |        |         
+    |     (OFPFC_DELETE)      |           |               |          | <-----------+ +------+ v         
+    | +---------------------> |           |  UDP_Packet   |          |               |                  
+    |                         |           | +-----------> |          |               |                  
+    |                         |           |               |          |               |                  
+    |                         |           |  UDP_Packet   |          |               |                  
+    |                         |           | +-----------> |          |               |                  
+    |      OFPT_FLOW_MOD      |           |               |          |               |                  
+    |      (OFPFC_ADD ::      |           |  UDP_Packet   |          |               |                  
+    |   Flow1: *OFPP_IN_PORT, |           | +-----------> |          |               |                  
+    |           …             |           |               |          |               |                  
+    |    FlowN: * of_portB)   |           |  UDP_Packet   |          |               |                  
+    | +---------------------> +-----------+ +-----------> +---------------------------------+ ^         
+    |                         |           |               |          |               |        | Add_flow
+    |                         |           |  UDP_Packet   |          |               |        |  delay  
+    |     OFPT_FLOW_MOD       |           | +-----------> |          |               |        |         
+    |     (OFPFC_DELETE)      |           |               |          |  UDP_Packet   |        |         
+    | +---------------------> |           |  UDP_Packet   |          | <-----------+ +------+ v         
+    |                         |           | +-----------> |          |               |                  
+    +                         +           +               +          +               +                  
+
+
+
+
+******************************************************************************************************
+******************************************************************************************************
+Mod_Flow delay
+******************************************************************************************************
+******************************************************************************************************
+The aim of this test is similar to Flow_add test. In Flow_mod test time required to modify the given number of 
+table flow entries is determined. 
+
++----+---+                +----+---+  +----+---+     +----+---+  +----+---+     +----+---+              
+|  dev0  |                | sdev0  |  |  dev1  |     | sdev2  |  |  dev2  |     | sdev2  |              
+| (Eth0) |                | (Eth0) |  | (Eth1) |     | (Eth2) |  | (Eth2) |     | (Eth2) |              
++---+----+                +---+----+  +---+----+     +----+---+  +---+----+     +----+---+              
+    |                         |           |               |          |               |                  
+    |                         |           |               |          |               |                  
+    |     OFPT_HELLO          |           |               |          |               |                  
+    | <---------------------+ |           |  UDP_Packet   |          |               |                  
+    |                         |           | +-----------> |          |               |                  
+    |     OFPT_FLOW_MOD       |           |               |          |               |                  
+    |     (OFPFC_DELETE)      |           |  UDP_Packet   |          |               |                  
+    | +---------------------> |           | +-----------> |          |               |                  
+    |                         |           |               |          |               |                  
+    |       OFPT_FLOW_MOD     |           |  UDP_Packet   |          |               |                  
+    |       (OFPFC_ADD ::     |           | +-----------> |          |               |                  
+    |  Flow1: * OFPP_IN_PORT) |           |               |          |               |                  
+    | +---------------------> |           |  UDP_Packet   |          |               |                  
+    |                         |           | +-----------> |          |               |                  
+    |      OFPT_FLOW_MOD      |           |               |          |               |                  
+    |      (OFPFC_ADD ::      |           |  UDP_Packet   |          |               |                  
+    |   Flow1: *OFPP_IN_PORT, |           | +-----------> |          |               |                  
+    |           …             |           |               |          |               |                  
+    |    FlowN: * of_portB)   |           |  UDP_Packet   |          |               |                  
+    | +---------------------> +-----------+ +-----------> +---------------------------------+ ^         
+    |                         |           |               |          |               |        | Mod_flow
+    |                         |           |  UDP_Packet   |          |               |        |  delay  
+    |     OFPT_FLOW_MOD       |           | +-----------> |          |  UDP_Packet   |        |         
+    |     (OFPFC_DELETE)      |           |               |          | <-----------+ +------+ v         
+    | +---------------------> |           |  UDP_Packet   |          |               |                  
+    |                         |           | +-----------> |          |               |                  
+    |                         |           |               |          |               |                  
+    |                         |           |  UDP_Packet   |          |               |                  
+    |                         |           | +-----------> |          |               |                  
+    |      OFPT_FLOW_MOD      |           |               |          |               |                  
+    |      (OFPFC_ADD ::      |           |  UDP_Packet   |          |               |                  
+    |   Flow1: *OFPP_IN_PORT, |           | +-----------> |          |               |                  
+    |           …             |           |               |          |               |                  
+    |    FlowN: * of_portB)   |           |  UDP_Packet   |          |               |                  
+    | +---------------------> +-----------+ +-----------> +---------------------------------+ ^         
+    |                         |           |               |          |               |        | Mod_flow
+    |                         |           |  UDP_Packet   |          |               |        |  delay  
+    |     OFPT_FLOW_MOD       |           | +-----------> |          |               |        |         
+    |     (OFPFC_DELETE)      |           |               |          |  UDP_Packet   |        |         
+    | +---------------------> |           |  UDP_Packet   |          | <-----------+ +------+ v         
+    |                         |           | +-----------> |          |               |                  
+    +                         +           +               +          +               +                  
+
+
+******************************************************************************************************
+******************************************************************************************************
+Data_path delay
+******************************************************************************************************
+******************************************************************************************************
+
+The Path_delay test allows determining path delay in control and data plane. In case of control plane both, OFPT_ECHO_REQUEST 
+and OFPT_ECHO_REPLY messages are used. The data field in echo request message must be copied into echo replay data field. When 
+OFPT_ECHO_REQUEUST is generated into this field the current system time is written. The difference between OFPT_ECHO_REPLY 
+message reception time and the time included in data field of this message, indicates the control path delay. 
+
+In the case of data plane path delay UDP packets are marked by the sequence numbers and packet generation time. In order 
+to reduce packet processing time the flow table stores  only one defined flow entry matches for incoming UDP packets and 
+directs  them into specific output port.
+
+Path delay in control plane is determined without any parameters. Path delay in data plane is studied for different packet 
+sizes and different time intervals between packets.
+
+
+          +----+---+                +----+---+  +----+---+     +----+---+  +----+---+     +----+---+       
+          |  dev0  |                | sdev0  |  |  dev1  |     | sdev2  |  |  dev2  |     | sdev2  |       
+          | (Eth0) |                | (Eth0) |  | (Eth1) |     | (Eth2) |  | (Eth2) |     | (Eth2) |       
+          +---+----+                +---+----+  +---+----+     +----+---+  +---+----+     +----+---+       
+              |                         |           |               |          |               |           
+              |                         |           |               |          |               |           
+              |     OFPT_HELLO          |           |               |          |               |           
+              | <---------------------+ |           |               |          |               |           
+              |                         |           |               |          |               |           
+              |     OFPT_FLOW_MOD       |           |               |          |               |           
+              |     (OFPFC_DELETE)      |           |               |          |               |           
+              | +---------------------> |           |               |          |               |           
+              |                         |           |               |          |               |           
+              |       OFPT_FLOW_MOD     |           |               |          |               |           
+              |       (OFPFC_ADD ::     |           |               |          |               |           
+              |    Flow1: * of_port B)  |           |               |          |               |           
+              | +---------------------> |           |   UDP_packet  |          |               |           
+              |                         |           | +-----------> +-----------------------------+ ^ Data 
+              |                         |           |               |          |   UDP_packet  |    | path 
+              |      OOFPT_ECHORREQ     |           |               |          | <-----------+ +--+ v delay
+Control ^ +---+ +---------------------> |           |               |          |               |           
+channel |     |                         |           |   UDP_packet  |          |               |           
+ delay  |     |      OOFPT_ECHO_REPLY   |           | +-----------> +-----------------------------+ ^ Data 
+        v +---+ <---------------------+ |           |               |          |   UDP_packet  |    | path 
+              |                         |           |               |          | <-----------+ +--+ v delay
+              |                         |           |               |          |               |           
+              |      OFPT_ECHO REQ      |           |   UDP_packet  |          |               |           
+Control ^ +---+ +---------------------> |           | +-----------> +-----------------------------+ ^ Data 
+channel |     |                         |           |               |          |   UDP_packet  |    | path 
+ delay  |     |      OFPT_ECHO_REPLY    |           |               |          | <-----------+ +--+ v delay
+        v +---+ <---------------------+ |           |               |          |               |           
+              |                         |           |   UDP_packet  |          |               |           
+              |                         |           | +-----------> +-----------------------------+ ^ Data 
+              |      OFPT_ECHO REQ      |           |               |          |   UDP_packet  |    | path 
+Control ^ +---+ +---------------------> |           |               |          | <-----------+ +--+ v delay
+channel |     |                         |           |               |          |               |           
+ delay  |     |      OFPT_ECHO_REPLY    |           |               |          |               |           
+        v +---+ <---------------------+ |           |               |          |               |           
+              +                         +           +               +          +               +           
